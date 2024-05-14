@@ -8,7 +8,7 @@ setp parport.0.reset-time 2500
 loadrt stepgen step_type=0,0,0,0
 loadrt pwmgen output_type=0
 loadrt debounce cfg=5
-setp debounce.0.delay 10
+setp debounce.0.delay 20
 
 addf parport.0.read base-thread
 addf stepgen.make-pulses base-thread
