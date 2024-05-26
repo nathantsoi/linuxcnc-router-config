@@ -1,0 +1,51 @@
+loadusr -W lcdbtns count=1
+loadrt toggle2nist count=1
+addf toggle2nist.0 servo-thread
+
+# one extra button, tie it to pause?
+#net gmc-hardware-07 gmoccapy.h-button.button-0 <= lcdbtns.button_bonus
+
+# wire in LEDs
+net mpg-x lcdbtns.0.xenabled
+net mpg-y lcdbtns.0.yenabled
+net mpg-z lcdbtns.0.zenabled
+net scale1 lcdbtns.0.lowscaleenable
+net scale2 lcdbtns.0.midscaleenable
+net scale3 lcdbtns.0.highscaleenable
+
+# Spindle Button
+net btn-spindle toggle2nist.0.in <= lcdbtns.0.button-spindle
+net spindle-is-on toggle2nist.0.is-on <= halui.spindle.0.is-on
+net tog-spindle-start toggle2nist.0.on => halui.spindle.0.start
+net tog-spindle-stop toggle2nist.0.off => halui.spindle.0.stop
+
+net gmc-hardware-00 gmoccapy.v-button.button-0 <= lcdbtns.0.v-button-0
+net gmc-hardware-01 gmoccapy.v-button.button-1 <= lcdbtns.0.v-button-1
+net gmc-hardware-02 gmoccapy.v-button.button-2 <= lcdbtns.0.v-button-2
+net gmc-hardware-03 gmoccapy.v-button.button-3 <= lcdbtns.0.v-button-3
+net gmc-hardware-04 gmoccapy.v-button.button-4 <= lcdbtns.0.v-button-4
+net gmc-hardware-05 gmoccapy.v-button.button-5 <= lcdbtns.0.v-button-5
+net gmc-hardware-06 gmoccapy.v-button.button-6 <= lcdbtns.0.v-button-6
+
+net gmc-hardware-07 gmoccapy.h-button.button-0 <= lcdbtns.0.h-button-0
+net gmc-hardware-08 gmoccapy.h-button.button-1 <= lcdbtns.0.h-button-1
+net gmc-hardware-19 gmoccapy.h-button.button-2 <= lcdbtns.0.h-button-2
+net gmc-hardware-10 gmoccapy.h-button.button-3 <= lcdbtns.0.h-button-3
+net gmc-hardware-11 gmoccapy.h-button.button-4 <= lcdbtns.0.h-button-4
+net gmc-hardware-12 gmoccapy.h-button.button-5 <= lcdbtns.0.h-button-5
+net gmc-hardware-13 gmoccapy.h-button.button-6 <= lcdbtns.0.h-button-6
+net gmc-hardware-14 gmoccapy.h-button.button-7 <= lcdbtns.0.h-button-7
+net gmc-hardware-15 gmoccapy.h-button.button-8 <= lcdbtns.0.h-button-8
+net gmc-hardware-16 gmoccapy.h-button.button-9 <= lcdbtns.0.h-button-9
+
+setp gmoccapy.jog.jog-velocity.analog-enable 1
+net gmc-jog-val gmoccapy.jog.jog-velocity.direct-value <= lcdbtns.0.jog-velocity
+
+setp gmoccapy.feed.feed-override.analog-enable 1
+net gmc-feed-val gmoccapy.feed.feed-override.direct-value <= lcdbtns.0.feed-override
+
+setp gmoccapy.spindle.spindle-override.analog-enable 1
+net gmc-spindle-val gmoccapy.spindle.spindle-override.direct-value <= lcdbtns.0.spindle-override
+
+setp gmoccapy.rapid.rapid-override.analog-enable 1
+net gmc-rapid-val gmoccapy.rapid.rapid-override.direct-value <= lcdbtns.0.rapid-override

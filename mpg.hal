@@ -1,0 +1,62 @@
+loadrt encoder num_chan=1
+loadrt mpgbtns count=1
+addf encoder.capture-position servo-thread
+addf encoder.update-counters base-thread
+addf mpgbtns.0 servo-thread
+
+loadrt ilowpass
+addf ilowpass.0 servo-thread
+
+setp ilowpass.0.scale 1000
+setp ilowpass.0.gain 0.01
+
+# If your MPG outputs a quadrature signal per click set x4 to 1
+# If your MPG puts out 1 pulse per click set x4 to 0
+setp encoder.0.x4-mode 0
+
+# For velocity mode, set to 1
+# In velocity mode the axis stops when the dial is stopped
+# even if that means the commanded motion is not completed,
+
+# For position mode (the default), set to 0
+# In position mode the axis will move exactly jog-scale
+# units for each count, regardless of how long that might take,
+setp axis.x.jog-vel-mode 1
+setp axis.y.jog-vel-mode 1
+setp axis.z.jog-vel-mode 1
+
+# The MPG encoder inputs
+net mpg-a encoder.0.phase-A <= parport.1.pin-10-in
+net mpg-b encoder.0.phase-B <= parport.1.pin-09-in
+
+# The output from encoder counts is sent to ilowpass
+net mpg-out ilowpass.0.in <= encoder.0.counts
+
+# The output from the ilowpass is sent to each axis jog count
+# Only the selected axis will move.
+net encoder-counts  <= ilowpass.0.out
+net encoder-counts => axis.x.jog-counts
+net encoder-counts => axis.y.jog-counts
+net encoder-counts => axis.z.jog-counts
+
+# The inputs to the mpg buttons component
+net scale1 mpgbtns.0.lowscalebtn <= parport.1.pin-06-in-not
+net scale2 mpgbtns.0.midscalebtn <= parport.1.pin-08-in-not
+net scale3 mpgbtns.0.highscalebtn <= parport.1.pin-02-in-not
+
+# The output from the mpg buttons component is sent to each axis jog scale
+net mpg-scale <= mpgbtns.0.scale
+net mpg-scale => axis.x.jog-scale
+net mpg-scale => axis.y.jog-scale
+net mpg-scale => axis.z.jog-scale
+
+# The Axis select inputs
+# this will allow a momentary switch per axis to select the current output
+# the enable button must be held to enable the axis
+net enable-btn mpgbtns.0.enablebtn <= parport.1.pin-04-in-not
+net mpg-x-sel mpgbtns.0.xselbtn <= parport.1.pin-07-in-not
+net mpg-y-sel mpgbtns.0.yselbtn <= parport.1.pin-05-in-not
+net mpg-z-sel mpgbtns.0.zselbtn <= parport.1.pin-03-in-not
+net mpg-x axis.x.jog-enable <= mpgbtns.0.xenabled
+net mpg-y axis.y.jog-enable <= mpgbtns.0.yenabled
+net mpg-z axis.z.jog-enable <= mpgbtns.0.zenabled

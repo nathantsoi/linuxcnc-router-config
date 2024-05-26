@@ -1,0 +1,77 @@
+component mpgbtns;
+pin in bit enablebtn;
+pin in bit xselbtn;
+pin in bit yselbtn;
+pin in bit zselbtn;
+pin in bit lowscalebtn;
+pin in bit midscalebtn;
+pin in bit highscalebtn;
+// selected indicates which axis is selected, but not yet enabled
+pin out bit xselected;
+pin out bit yselected;
+pin out bit zselected;
+// enable buttons are selected + enabled
+pin out bit xenabled;
+pin out bit yenabled;
+pin out bit zenabled;
+pin out bit lowscaleenable;
+pin out bit midscaleenable;
+pin out bit highscaleenable;
+pin out float scale;
+
+function _;
+author "Nathan Tsoi";
+license "MIT";
+;;
+
+#define LOW 0.000001
+#define MID 0.00001
+#define HIGH 0.0001
+
+// main function
+FUNCTION(_) {
+    xenabled = 0;
+    yenabled = 0;
+    zenabled = 0;
+    // set scale by pressing one of the 3 buttons
+    if (lowscalebtn) {
+        lowscaleenable = 1;
+        midscaleenable = 0;
+        highscaleenable = 0;
+        scale = LOW;
+    } else if (midscalebtn) {
+        lowscaleenable = 0;
+        midscaleenable = 1;
+        highscaleenable = 0;
+        scale = MID;
+    } else if (highscalebtn) {
+        lowscaleenable = 0;
+        midscaleenable = 0;
+        highscaleenable = 1;
+        scale = HIGH;
+    }
+    // set axis by pressing one of the 3 buttons
+    // and if the enable button is being held, enable the axis
+    if (xselbtn) {
+        xselected = 1;
+        yselected = 0;
+        zselected = 0;
+    } else if (yselbtn) {
+        xselected = 0;
+        yselected = 1;
+        zselected = 0;
+    } else if (zselbtn) {
+        xselected = 0;
+        yselected = 0;
+        zselected = 1;
+    }
+    if (enablebtn) {
+        if (xselected) {
+            xenabled = enablebtn;
+        } else if (yselected) {
+            yenabled = enablebtn;
+        } else if (zselected) {
+            zenabled = enablebtn;
+        }
+    }
+}
