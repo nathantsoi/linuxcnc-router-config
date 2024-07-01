@@ -148,9 +148,6 @@ void user_mainloop(void)
     char last_axis = '\0';
     char last_speed = '\0';
     int fd;
-    bool btn_set = 0;
-    struct timeval now;
-    struct timeval last_button_set_at;
 
 
     //int fd = serialport_init();
@@ -195,36 +192,6 @@ void user_mainloop(void)
                 last_speed = '3';
             }
 
-            // Default states
-            // This is necessary (the reset) because the button panel hardware only sends a "1" when the button is pressed and not a "0" when it is unpressed
-            if (btn_set) {
-                gettimeofday(&now, NULL);
-                if( (now.tv_usec - last_button_set_at.tv_usec) > BTN_RESET_TIME) {
-                    v_button_0 = 0;
-                    v_button_1 = 0;
-                    v_button_2 = 0;
-                    v_button_3 = 0;
-                    v_button_4 = 0;
-                    v_button_5 = 0;
-                    v_button_6 = 0;
-
-                    h_button_0 = 0;
-                    h_button_1 = 0;
-                    h_button_2 = 0;
-                    h_button_3 = 0;
-                    h_button_4 = 0;
-                    h_button_5 = 0;
-                    h_button_6 = 0;
-                    h_button_7 = 0;
-                    h_button_8 = 0;
-                    h_button_9 = 0;
-
-                    button_spindle = 0;
-                    button_bonus = 0;
-                    btn_set = 0;
-                }
-            }
-
             if(read(fd,&ch,1) > 0) {
                 if (bidx + 1 >= BUFSIZE) {
                     perror("serial buffer overflow\n");
@@ -255,8 +222,6 @@ void user_mainloop(void)
                         spindle_override = 1 - A2/4033.0f;
                         rapid_override = 1 - A0/4033.0f;
                     } else if (buffer[0] == 'B') {
-                        gettimeofday(&last_button_set_at, NULL);
-                        btn_set = 1;
                         // Format is B:00:0
                         char *p = &buffer[2];
                         int pin = strtoul(p, &p, 10);
