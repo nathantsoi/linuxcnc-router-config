@@ -1,1 +1,0 @@
-/home/cnc/src/linuxcnc/Manualmatic-Pendant/Software/linuxcnc/python-component/Manualmatic.py

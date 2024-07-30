@@ -1,0 +1,7 @@
+# the toolsetter and the 3d probe are on different pins, so we mux them to the motion.probe-input signal
+loadrt mux_generic config=bb2
+addf mux-gen.00 servo-thread 
+net probe-is-3d         mux-gen.00.sel-bit-00  motion.digital-out-00
+net probe-in-toolsetter mux-gen.00.in-bit-00   parport.1.pin-11-in
+net probe-in-touchprobe mux-gen.00.in-bit-01   parport.1.pin-12-in-not
+net probe-in            mux-gen.00.out-bit     motion.probe-input
