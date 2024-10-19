@@ -1,6 +1,6 @@
 # the toolsetter and the 3d probe are on different pins, so we mux them to the motion.probe-input signal
-loadrt or2 count=1
-addf or2.0 servo-thread 
-net probe-in-toolsetter  or2.0.in0 <= parport.1.pin-11-in-not
-net probe-in-touchprobe  or2.0.in1 <=  parport.1.pin-12-in
-net probe-and-toolsetter motion.probe-input <= or2.0.out
+loadrt or2 names=or2p
+addf or2p servo-thread 
+net probe-in-toolsetter  or2p.in0 <= parport.1.pin-11-in-not
+net probe-in-touchprobe  or2p.in1 <=  parport.1.pin-12-in
+net probe-and-toolsetter motion.probe-input <= or2p.out

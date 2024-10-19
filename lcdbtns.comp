@@ -46,6 +46,8 @@ pin out float rapid_override;
 pin out bit connected;
 
 option userspace yes;
+option extra_cleanup;
+option singleton yes;
 
 author "Nathan Tsoi";
 license "MIT";
@@ -53,299 +55,233 @@ license "MIT";
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h> 
+#include <stdint.h>
 #include <string.h>
-#include <unistd.h> 
+#include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <termios.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
 
-#define BAUDRATE B115200
-#define DEVICE "/dev/serial/by-id/usb-Vertile_STM32_Virtual_ComPort_8D7E43605351-if00"
+#define BAUDRATE B230400
+#define DEVICE "/dev/serial/by-id/usb-STMicroelectronics_GENERIC_F103CBTX_CDC_in_FS_Mode_8D7E43605351-if00"
 #define _POSIX_SOURCE 1
-#define BUFSIZE 50
+#define SERIAL_BUFFER_SIZE 64
 
 // predefs of later functions
-//int serialport_init();
+// int serialport_init();
 
-int
-set_interface_attribs (int fd, int speed, int parity)
+int set_interface_attribs(int fd, int speed, int parity)
 {
-        struct termios tty;
-        if (tcgetattr (fd, &tty) != 0)
-        {
-                fprintf (stderr, "error %d from tcgetattr", errno);
-                return -1;
-        }
+    struct termios tty;
+    if (tcgetattr(fd, &tty) != 0)
+    {
+        fprintf(stderr, "error %d from tcgetattr", errno);
+        return -1;
+    }
 
-        cfsetospeed (&tty, speed);
-        cfsetispeed (&tty, speed);
+    cfsetospeed(&tty, speed);
+    cfsetispeed(&tty, speed);
 
-        tty.c_cflag = (tty.c_cflag & ~CSIZE) | CS8;     // 8-bit chars
-        // disable IGNBRK for mismatched speed tests; otherwise receive break
-        // as \000 chars
-        tty.c_iflag &= ~IGNBRK;         // disable break processing
-        tty.c_lflag = 0;                // no signaling chars, no echo,
-                                        // no canonical processing
-        tty.c_oflag = 0;                // no remapping, no delays
-        tty.c_cc[VMIN]  = 0;            // read doesn't block
-        tty.c_cc[VTIME] = 5;            // 0.5 seconds read timeout
+    tty.c_cflag = (tty.c_cflag & ~CSIZE) | CS8; // 8-bit chars
+    // disable IGNBRK for mismatched speed tests; otherwise receive break
+    // as \000 chars
+    tty.c_iflag &= ~IGNBRK; // disable break processing
+    tty.c_lflag = 0;        // no signaling chars, no echo,
+                            // no canonical processing
+    tty.c_oflag = 0;        // no remapping, no delays
+    tty.c_cc[VMIN] = 0;     // read doesn't block
+    tty.c_cc[VTIME] = 5;    // 0.5 seconds read timeout
 
-        tty.c_iflag &= ~(IXON | IXOFF | IXANY); // shut off xon/xoff ctrl
+    tty.c_iflag &= ~(IXON | IXOFF | IXANY); // shut off xon/xoff ctrl
 
-        tty.c_cflag |= (CLOCAL | CREAD);// ignore modem controls,
-                                        // enable reading
-        tty.c_cflag &= ~(PARENB | PARODD);      // shut off parity
-        tty.c_cflag |= parity;
-        tty.c_cflag &= ~CSTOPB;
-        tty.c_cflag &= ~CRTSCTS;
+    tty.c_cflag |= (CLOCAL | CREAD);   // ignore modem controls,
+                                       // enable reading
+    tty.c_cflag &= ~(PARENB | PARODD); // shut off parity
+    tty.c_cflag |= parity;
+    tty.c_cflag &= ~CSTOPB;
+    tty.c_cflag &= ~CRTSCTS;
 
-        if (tcsetattr (fd, TCSANOW, &tty) != 0)
-        {
-                fprintf(stderr, "error %d from tcsetattr", errno);
-                return -1;
-        }
-        return 0;
+    if (tcsetattr(fd, TCSANOW, &tty) != 0)
+    {
+        fprintf(stderr, "error %d from tcsetattr", errno);
+        return -1;
+    }
+    return 0;
 }
 
-void
-set_blocking (int fd, int should_block)
+void set_blocking(int fd, int should_block)
 {
-        struct termios tty;
-        memset (&tty, 0, sizeof tty);
-        if (tcgetattr (fd, &tty) != 0)
-        {
-                fprintf(stderr, "error %d from tggetattr", errno);
-                return;
-        }
+    struct termios tty;
+    memset(&tty, 0, sizeof tty);
+    if (tcgetattr(fd, &tty) != 0)
+    {
+        fprintf(stderr, "error %d from tggetattr", errno);
+        return;
+    }
 
-        tty.c_cc[VMIN]  = should_block ? 1 : 0;
-        tty.c_cc[VTIME] = 5;            // 0.5 seconds read timeout
+    tty.c_cc[VMIN] = should_block ? 1 : 0;
+    tty.c_cc[VTIME] = 5; // 0.5 seconds read timeout
 
-        if (tcsetattr (fd, TCSANOW, &tty) != 0)
-                fprintf(stderr, "error %d setting term attributes", errno);
+    if (tcsetattr(fd, TCSANOW, &tty) != 0)
+        fprintf(stderr, "error %d setting term attributes", errno);
 }
 
+char out_buffer[SERIAL_BUFFER_SIZE];
+char serial_buffer[SERIAL_BUFFER_SIZE];
+char serial_buffer_start = 0;
+char serial_buffer_end = 0;
+
+void write_led_states(int fd)
+{
+    FOR_ALL_INSTS()
+    {
+        sprintf(out_buffer, "l%d%d%d%d%d%d\n", xenabled, yenabled, zenabled, lowscaleenable, midscaleenable, highscaleenable);
+    }
+    //printf("SENDING %s\n", out_buffer);
+    write(fd, out_buffer, strlen(out_buffer));
+}
+
+bool fill_serial_buffer(int fd)
+{
+    char c = 0;
+    // Fill the ros serial buffer if we have data
+    while (read(fd, &c, 1) > 0)
+    {
+        //printf("LCDBTNS got a char %c\n", c);
+        if (c == '\n')
+        {
+            break;
+        }
+        // fill the ring buffer
+        serial_buffer[serial_buffer_end++] = c;
+        if (serial_buffer_end >= SERIAL_BUFFER_SIZE)
+        {
+            serial_buffer_end = 0;
+        }
+    }
+    return c == '\n';
+}
+
+char read_serial_buffer()
+{
+    char c = serial_buffer[serial_buffer_start++];
+    if (serial_buffer_start >= SERIAL_BUFFER_SIZE)
+    {
+        serial_buffer_start = 0;
+    }
+    return c;
+}
+
+bool read_btn()
+{
+    return read_serial_buffer() == '1';
+}
+
+int read_adc()
+{
+    // adc returns a 4 digit number
+    char intstr[5];
+    for (int i = 0; i < 4; i++)
+    {
+        intstr[i] = read_serial_buffer();
+    }
+    return atoi(intstr);
+}
+
+void parse_serial_buffer()
+{
+    if (read_serial_buffer() != 'b')
+    {
+        perror("bad serial buffer");
+        return;
+    }
+    //printf("LCDBTNS got a buffer\n");
+    FOR_ALL_INSTS()
+    {
+        // read order must match the sending order in the microcontroller code
+        button_spindle = read_btn();
+        button_bonus = read_btn();
+        v_button_0 = read_btn();
+        v_button_1 = read_btn();
+        v_button_2 = read_btn();
+        v_button_3 = read_btn();
+        v_button_4 = read_btn();
+        v_button_5 = read_btn();
+        v_button_6 = read_btn();
+        h_button_0 = read_btn();
+        h_button_1 = read_btn();
+        h_button_2 = read_btn();
+        h_button_3 = read_btn();
+        h_button_4 = read_btn();
+        h_button_5 = read_btn();
+        h_button_6 = read_btn();
+        h_button_7 = read_btn();
+        h_button_8 = read_btn();
+        h_button_9 = read_btn();
+
+        jog_velocity = 1 - read_adc() / 4033.0f;
+        feed_override = 1 - read_adc() / 4033.0f;
+        spindle_override = 1 - read_adc() / 4033.0f;
+        rapid_override = 1 - read_adc() / 4033.0f;
+
+        //printf("LCDBTNS analog values %f %f %f %f\n", jog_velocity, feed_override, spindle_override, rapid_override);
+    }
+}
 
 // port setup
-struct termios toptions;;
+struct termios toptions;
 
-char axes[3] = "XYZ";
-char speeds[3] = "123";
+#define SLEEPTIME_US 10
+#define RECONNECT_DELAY_MS 1000
 
-// In usec
-// wait to reset the buttons
-#define BTN_RESET_TIME 40000
+int connect() {
+    // int fd = serialport_init();
+    printf("LCDBTNS opening %s\n", DEVICE);
+    int fd = open(DEVICE, O_RDWR | O_NOCTTY | O_SYNC);
+    if (fd < 0)
+    {
+        fprintf(stderr, "LCDBTNS error %d opening %s: %s", errno, DEVICE, strerror(errno));
+        return -1;
+    }
+    set_interface_attribs(fd, BAUDRATE, 0); // set speed, 8n1 (no parity)
+    set_blocking(fd, 0);
+    return fd;
+}
+
+int fd = -1;
+
+EXTRA_CLEANUP() {
+    if (fd >= 0) {
+        close(fd);
+        fprintf(stderr, "closed serial port");
+    }
+}
 
 void user_mainloop(void)
 {
+    printf("LCDBTNS starting.\n");
 
-    char buffer[BUFSIZE];
-    unsigned bidx = 0;
-    char ch;
-    char last_axis = '\0';
-    char last_speed = '\0';
-    int fd;
-
-
-    //int fd = serialport_init();
-    fd = open (DEVICE, O_RDWR | O_NOCTTY | O_SYNC);
-    if (fd < 0) {
-        fprintf (stderr, "error %d opening %s: %s", errno, DEVICE, strerror (errno));
-        exit(0);
-    }
-
-    set_interface_attribs (fd, BAUDRATE, 0);  // set speed to 115,200 bps, 8n1 (no parity)
-    set_blocking (fd, 0);                // set no blocking
-
-    while(fd != -1)
-    {
-        //  approx 1/4 sec appears to be optimum period for a steady display with min lag
-        //  may differ on another system with different thread speeds
-        // usleep(10);
-        // This macro is required to make linuxcnc run
-        FOR_ALL_INSTS()
+    while (1) {
+        usleep(SLEEPTIME_US);
+        if (fd < 0) {
+            printf("LCDBTNS connecting\n");
+            fd = connect();
+            if (fd < 0) {
+                FOR_ALL_INSTS() connected = 0;
+                usleep(RECONNECT_DELAY_MS * 1000);
+                continue;
+            }
+            printf("LCDBTNS connected\n");
+            FOR_ALL_INSTS() connected = 1;
+        }  
+        write_led_states(fd);
+        if (fill_serial_buffer(fd))
         {
-            connected = 1;
-            //printf( "." );
-            // Write LED values
-            if (xenabled && last_axis != 'x') {
-                write(fd, &axes[0], 1);
-                last_axis = 'x';
-            } else if (yenabled && last_axis != 'y') {
-                write(fd, &axes[1], 1);
-                last_axis = 'y';
-            } else if (zenabled && last_axis != 'z') {
-                write(fd, &axes[2], 1);
-                last_axis = 'z';
-            }
-            if (lowscaleenable && last_speed != '1') {
-                write(fd, &speeds[0], 1);
-                last_speed = '1';
-            } else if (midscaleenable && last_speed != '2') {
-                write(fd, &speeds[1], 1);
-                last_speed = '2';
-            } else if (highscaleenable && last_speed != '3') {
-                write(fd, &speeds[2], 1);
-                last_speed = '3';
-            }
-
-            if(read(fd,&ch,1) > 0) {
-                if (bidx + 1 >= BUFSIZE) {
-                    perror("serial buffer overflow\n");
-                }
-                // ignore extra chars
-                if (ch == '\n' || ch == '\0') {
-                    continue;
-                }
-                buffer[bidx++] = ch;
-                // debugging
-                //printf("%c", ch);
-                // Base case, use and reset the buffer
-                if (ch == '\r') {
-                    //printf("%s\n", &buffer[0], buffer);
-                    if (buffer[0] == 'A') {
-                        // format is A:0000:0000:0000:0000 where 0000 is one potentiomter integer value
-                        // read the analog values
-                        char* p = &buffer[2];
-                        int A0 = strtoul(p, &p, 10);
-                        *p++; // skip the colon
-                        int A1 = strtoul(p, &p, 10);
-                        *p++; // skip the colon
-                        int A2 = strtoul(p, &p, 10);
-                        *p++; // skip the colon
-                        int A3 = strtoul(p, &p, 10);
-                        jog_velocity = 1 - A1/4033.0f;
-                        feed_override = 1 - A3/4033.0f;
-                        spindle_override = 1 - A2/4033.0f;
-                        rapid_override = 1 - A0/4033.0f;
-                    } else if (buffer[0] == 'B') {
-                        // Format is B:00:0
-                        char *p = &buffer[2];
-                        int pin = strtoul(p, &p, 10);
-                        *p++; // skip the colon
-                        bool state = strtoul(p, &p, 10);
-                        //printf("btn %d", pin);
-                        switch (pin) {
-                            case 0:
-                                v_button_0 = state;
-                                break;
-                            case 1:
-                                v_button_1 = state;
-                                break;
-                            case 2:
-                                v_button_2 = state;
-                                break;
-                            case 3:
-                                v_button_3 = state;
-                                break;
-                            case 4:
-                                v_button_4 = state;
-                                break;
-                            case 5:
-                                v_button_5 = state;
-                                break;
-                            case 6:
-                                v_button_6 = state;
-                                break;
-                            case 7:
-                                h_button_0 = state;
-                                break;
-                            case 8:
-                                h_button_1 = state;
-                                break;
-                            case 9:
-                                h_button_2 = state;
-                                break;
-                            case 10:
-                                h_button_3 = state;
-                                break;
-                            case 11:
-                                h_button_4 = state;
-                                break;
-                            case 12:
-                                h_button_5 = state;
-                                break;
-                            case 13:
-                                h_button_6 = state;
-                                break;
-                            case 14:
-                                h_button_7 = state;
-                                break;
-                            case 15:
-                                h_button_8 = state;
-                                break;
-                            case 16:
-                                h_button_9 = state;
-                                break;
-                            case 17:
-                                button_spindle = state;
-                                break;
-                            case 18:
-                                button_bonus = state;
-                                break;
-                            default:
-                                break;
-                        }
-                    }
-                    bzero(buffer, BUFSIZE);
-                    bidx = 0;
-                }
-            }
+            parse_serial_buffer();
         }
     }
 
-    close(fd);
-    FOR_ALL_INSTS()
-    {
-        connected = 0;
-    }
-    fprintf(stderr, "closed serial port");
-
     exit(0);
 }
-
-/*
-int serialport_init()
-{
-    int fd;
-    fd = open(DEVICE, O_RDWR | O_NOCTTY | O_NDELAY);
-    if (fd == -1) {
-        perror("init_serialport: Unable to open port ");
-        return -1;
-    }
-
-    if (tcgetattr(fd, &toptions) < 0) {
-        perror("init_serialport: Couldn't get term attributes");
-        return -1;
-    }
-    speed_t brate = BAUDRATE;
-    cfsetispeed(&toptions, brate);
-    cfsetospeed(&toptions, brate);
-    // 8N1
-    toptions.c_cflag &= ~PARENB;
-    toptions.c_cflag &= ~CSTOPB;
-    toptions.c_cflag &= ~CSIZE;
-    toptions.c_cflag |= CS8;
-    // no flow control
-    toptions.c_cflag &= ~CRTSCTS;
-
-    toptions.c_cflag |= CREAD | CLOCAL;  // turn on READ & ignore ctrl lines
-    toptions.c_iflag &= ~(IXON | IXOFF | IXANY); // turn off s/w flow ctrl
-
-    toptions.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG); // make raw
-    toptions.c_oflag &= ~OPOST; // make raw
-
-    // see: http://unixwiz.net/techtips/termios-vmin-vtime.html
-    toptions.c_cc[VMIN]  = 1;
-    toptions.c_cc[VTIME] = 0;
-
-    if ( tcsetattr(fd, TCSANOW, &toptions) < 0) {
-        perror("init_serialport: Couldn't set term attributes");
-        return -1;
-    }
-    return fd;
-}
-*/

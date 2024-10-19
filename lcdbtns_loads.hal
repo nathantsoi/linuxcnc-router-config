@@ -1,0 +1,5 @@
+# all loadrts go here
+loadrt and2 names=and2.pr,and2.run
+loadrt or2 names=or2.pr
+loadrt toggle names=toggle.ok
+loadrt toggle2nist names=toggle2nist.pr,toggle2nist.spindle
