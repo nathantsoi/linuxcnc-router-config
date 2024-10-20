@@ -318,6 +318,10 @@ class ProbeScreen(object):
             self.setunits = "G20"
         self.on_ps_hal_stat_metric_mode_changed(self, self.stat.program_units-1)
 
+    def timed_wait_complete(self):
+        time_start = time.time()
+        self.command.wait_complete()
+        return time.time() - time_start
 
     # --------------------------
     #
@@ -327,7 +331,7 @@ class ProbeScreen(object):
     @restore_task_mode
     def gcode(self, s, distance=None, data=None):
         self.command.mode(linuxcnc.MODE_MDI)
-        self.command.wait_complete()
+        self.timed_wait_complete()
         for l in s.split("\n"):
             # Search for G1 followed by a space, otherwise we'll catch G10 too.
             if "G1 " in l:
@@ -336,12 +340,37 @@ class ProbeScreen(object):
             if distance is not None:
                 # set a non-default wait limit for wait_complete()
                 time_in = 1 + (distance / self.ps_rapid_speed ) * 60
-            print("time_in=", time_in)
+            #print("probe_screen time_in=", time_in)
+            #print("probe_screen:\n", l)
             self.command.mdi(l)
-            self.command.wait_complete(time_in)
+            self.timed_wait_complete()
+            if self.error_poll() == -1:
+                return -1
+
+            self.stat.poll()
+            # wait for the interpreter to return to idle state
+            while self.stat.interp_state != linuxcnc.INTERP_IDLE:
+                #print("probe_screen: interp_state=", self.stat.interp_state)
+                if self.error_poll() == -1:
+                    return -1
+                self.command.wait_complete()
+                self.stat.poll()
+            self.command.wait_complete()
             if self.error_poll() == -1:
                 return -1
         return 0
+
+        ## wait complete does not wait for the command to finish
+        # doesn't seeem to work
+        ## using this workaround: https://www.forum.linuxcnc.org/38-general-linuxcnc-questions/43474-wait-complete
+        #while True:
+        #    self.command.mdi(';workaround')
+        #    time_delta = self.timed_wait_complete()
+        #    print("gcode time_delta=", time_delta)
+        #    if self.error_poll() == -1:
+        #        return -1
+        #    break
+        #return 0
 
     @restore_task_mode
     def ocode(self, s, data=None):
@@ -434,8 +463,8 @@ class ProbeScreen(object):
             # display units equal machine units would be factor = 1,
             self.faktor = 1.0
 
-#        print("ps_hal_stat_metric_mode_changed", "  self.stat.linear_units = ", self.stat.linear_units)
-#        print("metric_units = ",metric_units, "ps_metric_mode = ",self.halcomp["ps_metric_mode"], "faktor =",self.faktor )
+        #print("probe_screen ps_hal_stat_metric_mode_changed", "  self.stat.linear_units = ", self.stat.linear_units)
+        #print("probe_screen metric_units = ",metric_units, "ps_metric_mode = ",self.halcomp["ps_metric_mode"], "faktor =",self.faktor )
         if metric_units:
             self.setunits = "G21"
             # Settings
