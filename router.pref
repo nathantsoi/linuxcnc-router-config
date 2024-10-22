@@ -1,5 +1,5 @@
 [DEFAULT]
-dro_digits = 3
+dro_digits = 2
 dro_size = 28
 abs_color = #0000FF
 rel_color = #000000
@@ -66,7 +66,7 @@ run_from_line = no_run
 unlock_way = no
 show_preview_on_offset = False
 use_keyboard_shortcuts = True
-tool_in_spindle = 1
+tool_in_spindle = 2
 offset_axis_x = 0.0
 offset_axis_y = 0.0
 offset_axis_z = 0.0

@@ -26,8 +26,8 @@ setp axis.y.jog-vel-mode 1
 setp axis.z.jog-vel-mode 1
 
 # The MPG encoder inputs
-net mpg-a encoder.0.phase-A <= parport.1.pin-10-in
-net mpg-b encoder.0.phase-B <= parport.1.pin-09-in
+net mpg-a encoder.0.phase-A <= parport.1.pin-09-in
+net mpg-b encoder.0.phase-B <= parport.1.pin-10-in
 
 # The output from encoder counts is sent to ilowpass
 net mpg-out ilowpass.0.in <= encoder.0.counts

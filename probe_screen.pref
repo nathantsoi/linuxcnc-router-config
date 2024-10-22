@@ -10,7 +10,7 @@ chk_arm_enable = False
 ps_metric_mode = True
 ps_searchvel = 300.0
 ps_probevel = 30.0
-ps_z_clearance = 4.0
+ps_z_clearance = 3.0
 ps_probe_max = 10.0
 ps_probe_latch = 2.0
 ps_probe_diam = 2.0
@@ -21,6 +21,6 @@ ps_offs_y = 0.0
 ps_offs_z = 0.0
 ps_arm_delta_x = 0.0
 ps_arm_delta_y = 0.0
-setterheight = -52.6351381428
-blockheight = -93.8118755692
+setterheight = -52.6344756039
+blockheight = -93.8097038375
 
